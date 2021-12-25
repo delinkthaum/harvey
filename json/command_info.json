@@ -1,0 +1,82 @@
+{
+    "help": {
+        "desc": "You are here.",
+        "args": {
+            "command": "The name of the command you wish to get info about. Provides descriptions of all commands if not specified."
+        },
+        "footer": "Why are you searching for this?",
+        "aliases": ["info"],
+        "subcommands": {}
+    },
+    "node": {
+        "desc": "Pull info about our Teztools node from the status page.",
+        "args": {},
+        "footer": "",
+        "aliases": [],
+        "subcommands": {}
+    },
+    "steal": {
+        "desc": "Grab the image from a URL and add it to this server as an emoji.",
+        "args": {
+            "name": "Name to use for the emoji. Cannot contain whitespace.",
+            "url": "URL to the image. Must point to a PNG, JPEG, or GIF."
+        },
+        "footer": "",
+        "aliases": [],
+        "subcommands": {}
+    },
+    "reaction_roles": {
+        "desc": "Add or remove roles by reacting to a post by Harvey.",
+        "args": {},
+        "footer": "Requires an admin role to manage.",
+        "aliases": ["rr"],
+        "subcommands": {
+            "check": {
+                "desc": "Update the database, removing any reaction role posts that no longer exist. Then list all existing posts.",
+                "args": {},
+                "footer": "Requires an admin role to use.",
+                "aliases": ["c"]
+            },
+            "post": {
+                "desc": "Create a new reaction role post in the current channel.",
+                "args": {},
+                "footer": "Requires an admin role to use.",
+                "aliases": ["p"]
+            },
+            "add": {
+                "desc": "Add a new reaction role to all posts.",
+                "args": {
+                    "emoji": "The emoji to use for the role. Use `:emoji:`",
+                    "role": "The role to add. Use `@role`"
+                },
+                "footer": "Requires an admin role to use.",
+                "aliases": ["a"]
+            },
+            "remove": {
+                "desc": "Remove all roles associated with an emoji from all posts",
+                "args": {
+                    "emoji": "The emoji to remove from reaction roles. Use `:emoji:`"
+                },
+                "footer": "Requires an admin role to use.",
+                "aliases": ["rem", "r"]
+            }
+        }
+    },
+    "log": {
+        "desc": "Set the logging channel for this server.",
+        "args": {},
+        "footer": "Reaction role assignment/removal writes to this channel.",
+        "aliases": ["logging"],
+        "subcommands": {}
+
+    },
+    "create_role": {
+        "desc": "Create a new pingable role.",
+        "args": {
+            "name": "Name of the role. Multiple space-separated words can be used, though underscores are recommended."
+        },
+        "footer": "Requires an admin role to use.",
+        "aliases": ["role"],
+        "subcommands": {}
+    }
+}

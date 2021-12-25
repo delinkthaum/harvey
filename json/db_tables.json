@@ -1,0 +1,16 @@
+{
+    "tables": {
+        "rr_role_table": {
+            "name": "reaction_roles",
+            "create_query": "CREATE TABLE IF NOT EXISTS 'reaction_roles' ('emoji_id' INT, 'role_id' INT, 'guild_id' INT, 'role_desc' VARCHAR)"
+        },
+        "rr_post_table": {
+            "name": "reaction_posts",
+            "create_query": "CREATE TABLE IF NOT EXISTS 'reaction_posts' ('message_id' INT, 'channel_id' INT, 'guild_id' INT)"
+        },
+        "logging_channel_table": {
+            "name": "server_logging",
+            "create_query": "CREATE TABLE IF NOT EXISTS 'server_logging' ('guild_id' INT, 'channel_id' INT)"
+        }
+    }
+}

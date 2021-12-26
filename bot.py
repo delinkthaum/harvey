@@ -30,7 +30,8 @@ bot.logging_channels = {
 @bot.event
 async def on_ready():
     logging.info(
-        f"Logged in as '{bot.user.name}'. Latency: {bot.latency * 1000:.2f}ms."
+        f"Logged in as '{bot.user.name}' version {config.HARVEY_VERSION}. "
+        f"Latency: {bot.latency * 1000:.2f}ms."
     )
     orders.setup(bot)
     cogs.setup(bot)

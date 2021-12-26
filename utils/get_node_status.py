@@ -39,6 +39,7 @@ def get_node_info(
             name
             sync_state
             diskpct
+            version
             updated
         If a non-200 code is received from the site, return an empty dict.
     """

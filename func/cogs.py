@@ -112,6 +112,9 @@ class Roles(commands.Cog):
         # don't assign reactions to the bot.
         if message.author.id != bot_id or user_id == bot_id:
             return
+        # Ignore posts made by the bot that aren't for reaction roles.
+        if message.embeds[0].title != "Reaction Roles":
+            return
         post_exists = self.bot.db.post_exists(
             message_id=message_id,
             channel_id=channel_id,
@@ -170,6 +173,9 @@ class Roles(commands.Cog):
         emoji_id = emoji.id
         # Ignore posts made by non-bot users to avoid spamming error messages.
         if message.author.id != self.bot.user.id:
+            return
+        # Ignore posts made by the bot that aren't for reaction roles.
+        if message.embeds[0].title != "Reaction Roles":
             return
         post_exists = self.bot.db.post_exists(
             message_id=message_id,

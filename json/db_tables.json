@@ -11,6 +11,10 @@
         "logging_channel_table": {
             "name": "server_logging",
             "create_query": "CREATE TABLE IF NOT EXISTS 'server_logging' ('guild_id' INT, 'channel_id' INT)"
+        },
+        "sales_feed_table": {
+            "name": "sales_feeds",
+            "create_query": "CREATE TABLE IF NOT EXISTS 'sales_feeds' ('guild_id' INT, 'channel_id' INT, 'minimum_sale_amount' INT)"
         }
     }
 }

@@ -100,7 +100,6 @@ class Roles(commands.Cog):
         user_id = payload.user_id
         bot_id = self.bot.user.id
         logging_channel = self.bot.logging_channels.get(guild_id)
-
         # Confirm existence of the message and emoji in the database table.
         channel_id = payload.channel_id
         channel = self.bot.get_channel(channel_id)

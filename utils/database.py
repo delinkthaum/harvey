@@ -544,7 +544,7 @@ class Database(object):
                 f"Found minimum sale feed amount '{minimum_sale_amount}' for server "
                 f"'{guild_id}' and channel '{channel_id}'."
             )
-            return channel_id
+            return minimum_sale_amount
 
     def get_sales_feeds(self) -> pd.DataFrame:
         """Pull all sales feed data in the self.sales_feed_table.

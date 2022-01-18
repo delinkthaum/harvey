@@ -17,5 +17,6 @@ TOKEN = os.getenv("BOT_TOKEN")
 DEFAULT_PREFIX = os.getenv("BOT_PREFIX")
 
 NODE_NAME = os.getenv("NODE_NAME")
+NODE_RPC = os.getenv("NODE_RPC")
 NODE_STATUS_JSON = os.getenv("NODE_STATUS_JSON")
 NODE_STATUS_PAGE = os.getenv("NODE_STATUS_PAGE")

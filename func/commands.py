@@ -3,6 +3,7 @@
     Language: Python 3.9
 """
 
+import asyncio
 import logging
 
 from discord.ext import commands
@@ -13,6 +14,7 @@ import requests
 from harvey import config
 from harvey.utils import image_refs  # Not yet implemented.
 from harvey.utils import get_node_status
+from harvey.utils import tez
 
 # Useful message formatting info:
 # https://discord.com/developers/docs/reference#message-formatting-formats
@@ -26,6 +28,7 @@ def setup(bot: commands.Bot):
     steal(bot)
     reaction_roles(bot)
     create_role(bot)
+    fxhash_sales_feed(bot)
 
 
 def help_command(bot: commands.Bot):
@@ -77,14 +80,14 @@ def help_command(bot: commands.Bot):
             embed.set_footer(
                 text="Use '!help command' to get info about a specific function."
             )
-            return await ctx.channel.send(embed=embed)
+            return await ctx.send(embed=embed)
 
         logging.debug(f"Help called for command '{command}'.")
         try:
             command = command_map[command]
             info = command_info[command]
         except KeyError:
-            return await ctx.channel.send(f"Command `{command}` does not exist.")
+            return await ctx.send(f"Command `{command}` does not exist.")
         else:
             title = command
         if subcommand:
@@ -92,7 +95,7 @@ def help_command(bot: commands.Bot):
                 subcommand = subcommand_map[subcommand]
                 info = info["subcommands"][subcommand]
             except KeyError:
-                return await ctx.channel.send(
+                return await ctx.send(
                     f"Command `{command}` does not have subcommand `{subcommand}`."
                 )
             else:
@@ -115,7 +118,7 @@ def help_command(bot: commands.Bot):
             pass
         if footer := info["footer"]:
             embed.set_footer(text=footer)
-        return await ctx.channel.send(embed=embed)
+        return await ctx.send(embed=embed)
 
 
 def set_logging_channel(bot: commands.Bot):
@@ -138,7 +141,7 @@ def set_logging_channel(bot: commands.Bot):
         guild_id = ctx.guild.id
         if not isinstance(channel, discord.TextChannel):
             raise commands.ArgumentParsingError(
-                f"Second argument of '{ctx.command}' `channel` must be a channel. "
+                f"First argument of '{ctx.command}' `channel` must be a channel. "
                 f"{type(channel)}:'{channel}' was passed in."
             )
         channel_id = channel.id
@@ -216,7 +219,7 @@ def node(bot: commands.Bot):
         else:
             embed.color = discord.Color.green()
         logging.debug("Posting node status message.")
-        return await ctx.channel.send(embed=embed)
+        return await ctx.send(embed=embed)
 
 
 def steal(bot: commands.Bot):
@@ -321,7 +324,7 @@ def reaction_roles(bot: commands.Bot):
                 f"`{i}`"
                 for i in bot.command_info["reaction_roles"]["subcommands"].keys()
             )
-            return await ctx.channel.send(message)
+            return await ctx.send(message)
 
     @reaction_roles.command(aliases=["c"])
     async def check(ctx: commands.Context):
@@ -615,3 +618,343 @@ def create_role(bot: commands.Bot):
         role_id = role.id
         logging.info(f"Created new role '{role_name}'.")
         return await ctx.send(f"Successfully created new role <@&{role_id}>.")
+
+
+def fxhash_sales_feed(bot: commands.Bot):
+    """Create a live sales feed of objkts on fxhash.xyz"""
+    bot.remove_command("fxhash_sales_feed")
+
+    async def create_message(sale: tez.FxhashSale) -> discord.Embed:
+        """Create an Embed message for a given fxhash sale operation.
+
+        Parameters
+        ----------
+        sale: tez.FxhashSale
+            Sale data class.
+
+        Returns
+        ---------
+        discord.Embed
+            Message to post to a channel. Includes all token attributes; formatted
+            links to the tzkt sale operation, buyer profile, and seller profile; and a
+            thumbnail image of the token pulled using the ipfs link.
+        """
+        # Attributes are organized by use with Embed variables constructed immediately.
+        token_id = sale.token_id
+        logging.debug(f"Building Embed for fxhash token '{token_id}'.")
+        token_title = sale.token_title
+        token_author = sale.token_author
+        title = f"{token_title} - {token_author}"
+        url = f"https://fxhash.xyz/objkt/{token_id}"
+        embed = discord.Embed(title=title, url=url)
+        # Display the image.
+        token_ipfs = sale.token_ipfs
+        embed.set_thumbnail(url=token_ipfs)
+        # Field 1: Sale amount.
+        amount = sale.amount
+        amount_string = f"{amount}ꜩ"
+        embed.add_field(name="Sale Amount", value=amount_string, inline=False)
+        # Field 2: Link to the seller's fxhash profile. Use their alias if possible.
+        seller_hash = sale.seller_hash
+        seller_alias = sale.seller_hash
+        # Alias sometimes comes through as a NaN float.
+        seller_alias = seller_alias if seller_alias is True else seller_hash
+        seller_string = (
+            f"[{seller_alias}](https://www.fxhash.xyz/pkh/{seller_hash}/collection)"
+        )
+        embed.add_field(name="Seller", value=seller_string, inline=False)
+        # Field 3: Link to the buyer's fxhash profile. Use their alias if possible.
+        buyer_hash = sale.buyer_hash
+        buyer_alias = sale.buyer_alias
+        buyer_alias = buyer_alias if buyer_alias is True else buyer_hash
+        buyer_string = (
+            f"[{buyer_alias}](https://www.fxhash.xyz/pkh/{buyer_hash}/collection)"
+        )
+        embed.add_field(name="Buyer", value=buyer_string, inline=False)
+        # Field 4: Link to the sale operation on tzkt.
+        txn_hash = sale.txn_hash
+        sale_string = f"[tzkt.io](https://tzkt.io/{txn_hash})"
+        embed.add_field(name="Sale Operation", value=sale_string, inline=False)
+
+        return embed
+
+    @bot.group(aliases=["sales", "feed"])
+    @commands.has_permissions(administrator=True)
+    async def fxhash_sales_feed(ctx: commands.Context):
+        if not ctx.invoked_subcommand:
+            message = "Command `fxhash_sales_feed` has subcommands" + ", ".join(
+                f"`{i}`"
+                for i in bot.command_info["fxhash_sales_feed"]["subcommands"].keys()
+            )
+            return await ctx.send(message)
+
+    @fxhash_sales_feed.command(aliases=["running", "status"])
+    async def notify(ctx: commands.Context, override_status: str = None):
+        """Check the status of the sales feed and provide an update to the user. If
+        the optional override_status is provided, instead notify them of the given
+        status without checking
+
+        Parameters
+        ----------
+        ctx: commands.Context
+            Context of the command.
+        override_status: str
+            Optional status to provide the user - used for start/stop notifications.
+            (Optional) Defaults to: None
+        """
+        if not override_status:
+            status = "Running" if bot.sales_feed_active else "Inactive"
+        else:
+            status = override_status
+        logging.debug(f"Updating user of sales feed status '{status}'.")
+        message = f"Sales feed {status.lower()}. "
+        sales_feeds = bot.db.get_sales_feeds()
+        if sales_feeds.empty:
+            message += (
+                "No sales feed channels are set up. Use `!sales add` to set one up."
+            )
+        else:
+            min_sale_amount = min(sales_feeds["minimum_sale_amount"].values)
+            message += (
+                f"`{len(sales_feeds)}` sales feed channel(s) are currently set up with "
+                f"a global minimum amount of `{min_sale_amount}ꜩ`."
+            )
+        return await ctx.send(message)
+
+    @fxhash_sales_feed.command(aliases=["a", "set", "s"])
+    async def add(
+        ctx: commands.Context, channel: discord.TextChannel, min_amount: int = 0
+    ):
+        """Add a sales feed record or update an existing sales feed record for a
+        channel in a server.
+
+        Parameters
+        ----------
+        ctx: commands.Context
+            Context of the command.
+        channel: discord.TextChannel
+            Channel to use within the current server.
+        min_amount: int
+            Minimum sale amount to post the sale in the channel.
+            (Optional) Defaults to: 0, which will include all sales.
+        """
+        guild_id = ctx.guild.id
+        if not isinstance(channel, discord.TextChannel):
+            raise commands.ArgumentParsingError(
+                f"First argument of '{ctx.command}' `channel` must be a channel. "
+                f"{type(channel)}:'{channel}' was passed in."
+            )
+        channel_id = channel.id
+        logging.debug(
+            f"Adding sales feed channel '{channel_id}' in server '{guild_id}'."
+        )
+        # If updating, store original amount for output to user.
+        existing_amount = bot.db.get_sales_feed_amount(
+            guild_id=guild_id, channel_id=channel_id
+        )
+        if not bot.db.set_sales_feed(
+            guild_id=guild_id, channel_id=channel_id, min_amount=min_amount
+        ):
+            return await ctx.send(
+                f"Unable to add sales feed channel {channel.mention}."
+            )
+        elif existing_amount:
+            return await ctx.send(
+                f"Updated sales feed channel {channel.mention} - set min amount from "
+                f"`{existing_amount}ꜩ` to `{min_amount}ꜩ`."
+            )
+        else:
+            return await ctx.send(
+                f"Added sales feed channel {channel.mention} with min amount "
+                f"`{min_amount}ꜩ`."
+            )
+
+    @fxhash_sales_feed.command(aliases=["r", "rem", "d", "del"])
+    async def remove(ctx: commands.Context, channel: discord.TextChannel):
+        """Remove a sales feed channel in a server.
+
+        Parameters
+        ----------
+        ctx: commands.Context
+            Context of the command.
+        channel: discord.TextChannel
+            Channel to use within the current server.
+        """
+        guild_id = ctx.guild.id
+        if not isinstance(channel, discord.TextChannel):
+            raise commands.ArgumentParsingError(
+                f"First argument of '{ctx.command}' `channel` must be a channel. "
+                f"{type(channel)}:'{channel}' was passed in."
+            )
+        channel_id = channel.id
+        logging.debug(
+            f"Adding sales feed channel '{channel_id}' in server '{guild_id}'."
+        )
+        existing_amount = bot.db.get_sales_feed_amount(
+            guild_id=guild_id, channel_id=channel_id
+        )
+        if not existing_amount:
+            return await ctx.send(
+                f"{channel.mention} is not set as a sales feed channel."
+            )
+        if not bot.db.delete_sales_feed(guild_id=guild_id, channel_id=channel_id):
+            return await ctx.send(
+                f"Unable to remove sales feed channel {channel.mention}."
+            )
+        else:
+            return await ctx.send(
+                f"Removed sales feed channel {channel.mention}."
+            )
+
+    @fxhash_sales_feed.command(aliases=["list"])
+    async def list_channels(ctx: commands.Context):
+        """List all active sales feed channels in the current server.
+
+        Parameters
+        ----------
+        ctx: commands.Context
+            Context of the command.
+        """
+        guild_id = ctx.guild.id
+        logging.debug(f"Listing sales feed channels in guild '{guild_id}'.")
+        feeds = bot.db.get_sales_feeds()
+        in_guild = feeds.loc[feeds["guild_id"] == guild_id]
+        sales_channels = []
+        for row in in_guild.itertuples():
+            channel = await bot.fetch_channel(row.channel_id)
+            amount = f"{row.minimum_sale_amount}ꜩ"
+            sales_channels.append(f"{channel.mention} - {amount}")
+        embed = discord.Embed(
+            title="Sales Feeds",
+            description=(
+                f"Below are the sales feed channels in the current server with their "
+                f"minimum sale amounts::\n\n_ _{'\n'.join(sales_channels)}"
+            )
+        )
+        embed.set_footer(text="Use `!feed add` to add a new sales feed channel.")
+        return await ctx.send(embed=embed)
+
+    @fxhash_sales_feed.command(aliases=["begin"])
+    async def start(ctx: commands.Context):
+        """Start the sales feed and loop through blocks. If it's already active, notify
+        the user.
+
+        Parameters
+        ----------
+        ctx: commands.Context
+            Context of the command.
+        """
+        if bot.sales_feed_active:
+            return await ctx.send(
+                "Sales feed is already running. Use `sales list` to see active sales "
+                "channels in this server. Use `sales add` to add a new channel."
+            )
+        logging.debug("Initializing sales feed.")
+        bot.sales_feed_active = True  # Drives the loop.
+        tc = tez.TezosConnection()
+
+        # Keep track of the previous block_id to avoid skipping blocks if multiple
+        # messages cause delays over 30s. This also handles delays and other
+        # lag/timeout issues.
+        prev_block_id = None
+        while bot.sales_feed_active:
+            current_block_id, _ = tc.tzkt_get_current_block()
+
+            # First time setup and message to user.
+            if prev_block_id is None:
+                prev_block_id = current_block_id - 1
+                status = f"started at block `{current_block_id}`"
+                await notify(ctx=ctx, override_status=status)
+            # Loop limiters.
+            if current_block_id == prev_block_id:  # Block hasn't advanced.
+                logging.info(
+                    f"Current block '{current_block_id}' has not incremented past "
+                    f"'{prev_block_id}'."
+                )
+                prev_block_id = current_block_id
+                # Shorter delay to cycle through blocks if the loop gets behind.
+                await asyncio.sleep(20)
+                continue
+            elif current_block_id > prev_block_id + 1:  # Feed is behind.
+                current_block_id = prev_block_id + 1  # Advance one block.
+            sales_feeds = bot.db.get_sales_feeds()
+            if sales_feeds.empty:
+                logging.info(
+                    f"No sales feeds active. Skipping block '{current_block_id}'."
+                )
+                prev_block_id = current_block_id
+                await asyncio.sleep(30)  # Full delay until feeds are added.
+                continue
+            else:
+                min_sale_amount = min(sales_feeds["minimum_sale_amount"].values)
+                logging.info(
+                    f"Searching txns in block '{current_block_id}' for fxhash sales "
+                    f"above {min_sale_amount}ꜩ."
+                )
+
+            sales = tc.tzkt_get_fxhash_sales_by_block(
+                block_id=current_block_id,
+                min_sale_amount=min_sale_amount,
+            )
+            logging.info(
+                f"Sales feed found {len(sales)} in block '{current_block_id}' above "
+                f"{min_sale_amount}ꜩ."
+            )
+            # Each sale must be posted to at least one server/channel.
+            for sale in sales:
+                # Concatenate dicts.
+                token_id = sale.token_id
+                # TODO: Simplify with update call from dict get_token output?
+                fxhash_info = tc.fxhash_get_token(token_id=token_id)
+                sale.token_title = fxhash_info["token_title"]
+                sale.token_author = fxhash_info["token_author"]
+                sale.token_ipfs = fxhash_info["token_ipfs"]
+                sale.token_hash = fxhash_info["token_hash"]
+
+                # Construct and post message where appropriate.
+                embed = await create_message(sale=sale)
+
+                post_channels = sales_feeds.loc[
+                    sale.amount >= sales_feeds["minimum_sale_amount"]
+                ]
+                for row in post_channels.itertuples():
+                    guild_id = row.guild_id
+                    channel_id = row.channel_id
+                    channel = await bot.fetch_channel(channel_id)
+                    logging.debug(
+                        f"Posting message for {token_id} in channel '{channel_id}' in "
+                        f"server '{guild_id}'."
+                    )
+                    await channel.send(embed=embed)
+                    logging.info(
+                        f"Posted message for {token_id} in channel '{channel_id}' in "
+                        f"server '{guild_id}'."
+                    )
+                logging.info(
+                    f"Posted message for sale of token '{token_id}' to "
+                    f"{len(post_channels)} channels."
+                )
+            logging.info(
+                f"Finished posting of {len(sales)} sales for block "
+                f"'{current_block_id}'."
+            )
+            prev_block_id = current_block_id
+            # Shorter delay to cycle through blocks if the loop gets behind.
+            await asyncio.sleep(20)
+
+    @fxhash_sales_feed.command(aliases=["kill"])
+    async def stop(ctx: commands.Context):
+        """Stop the sales feed by updating bot.sales_feed_active to False. Notify the
+        user.
+
+        Parameters
+        ----------
+        ctx: commands.Context
+            Context of the command.
+        """
+        logging.info(f"Stopping sales feed.")
+        bot.sales_feed_active = False
+        tc = tez.TezosConnection()
+        current_block_id, _ = tc.tzkt_get_current_block()
+        status = f"stopped at block `{current_block_id}`"
+        return await notify(ctx=ctx, override_status=status)

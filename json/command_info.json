@@ -78,5 +78,48 @@
         "footer": "Requires an admin role to use.",
         "aliases": ["role"],
         "subcommands": {}
+    },
+    "fxhash_sales_feed": {
+        "desc": "Manage sales feed channels for sales on fxhash.",
+        "args": {},
+        "footer": "",
+        "aliases": ["sales", "feed"],
+        "subcommands": {
+            "add": {
+                "desc": "Add a channel to the sales feed.",
+                "args": {
+                    "channel": "Channel to add.",
+                    "min_amount": "Minimum amount (in ꜩ) for a sale to be posted to this channel."
+                },
+                "footer": "This can be used to the `min_amount` for an existing sales feed channel.",
+                "aliases": ["set", "update"]
+            },
+            "remove": {
+                "desc": "Remove a channel from the sales feed.",
+                "args": {
+                    "channel": "Channel to remove."
+                },
+                "footer": "",
+                "aliases": ["rem", "delete", "del"]
+            },
+            "list_channels": {
+                "desc": "List all sales feed channels in the current server and their `min_amount` values.",
+                "args": {},
+                "footer": "If no active channels exist, a simple notification will be posted.",
+                "aliases": ["list"]
+            },
+            "start": {
+                "desc": "Start the sales feed.",
+                "args": {},
+                "footer": "Requires an admin role to use.",
+                "aliases": ["begin"]
+            },
+            "stop": {
+                "desc": "Stop the sales feed.",
+                "args": {},
+                "footer": "Requires an admin role to use.",
+                "aliases": ["end"]
+            }
+        }
     }
 }

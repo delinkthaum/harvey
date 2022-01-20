@@ -1,6 +1,8 @@
-""" pytezos.py -- Tezos methods for Harvey.
+""" tez.py -- Tezos methods for Harvey.
 
     Language: Python 3.9
+
+    Powered by TzKT API: tzkt.io
 
     NOTE: Code methods and inspiration yoinked from the following:
     - https://github.com/murbard/pytezos
@@ -30,6 +32,7 @@ TZKT_BASE_URL = "https://api.tzkt.io/v1"
 FXHASH_GENTK = "KT1KEa8z6vWXDJrVqtMrAeDVzsvxat3kHaCE"
 FXHASH_MARKETPLACE = "KT1Xo5B7PNBAeynZPmca4bRh6LQow4og1Zb9"
 
+
 @dataclass
 class FxhashSale(object):
     """Dataclass containing info about an fxhash sale.
@@ -43,12 +46,12 @@ class FxhashSale(object):
     seller_hash: str
         Seller of the token. Used to create a profile link.
     seller_alias: str
-        TZKT alias of the seller. Used to provide a readable name. If no alias exists,
+        Fxhash alias of the seller. Used to provide a readable name. If no alias exists,
         the seller's hash is used.
     buyer_hash: str
         Buyer of the token. Used to create a profile link.
     buyer_alias: str
-        TZKT alias of the buyer. Used to provide a readable name. If no alias exists,
+        Fxhash alias of the buyer. Used to provide a readable name. If no alias exists,
         the buyer's hash is used.
     timestamp: str
         Date and time of the sale. Stored as a timestamp value pulled from the sale
@@ -60,8 +63,9 @@ class FxhashSale(object):
     token_author: str
         Creator of the token. Used for the message header.
     txn_hash: str
-        Sale operation. Used to create a TZKT link to the sale.
+        Sale operation. Used to create a TzKT link to the sale.
     """
+
     token_id: int = None
     amount: float = 0.0
     seller_hash: str = None
@@ -229,7 +233,7 @@ class TezosConnection(object):
         return df
 
     def tzkt_get_account(self, address: str) -> dict:
-        """Pull an account from the TZKT API.
+        """Pull an account from the TzKT API.
 
         Ref.: https://api.tzkt.io/#operation/Accounts_GetByAddress
 
@@ -249,7 +253,7 @@ class TezosConnection(object):
         return result
 
     def tzkt_get_current_block(self) -> Tuple[int, str]:
-        """TZKT API equivalent of self.get_current_block().
+        """TzKT API equivalent of self.get_current_block().
 
         Returns
         ---------
@@ -273,7 +277,7 @@ class TezosConnection(object):
             return block_level, block_hash
 
     def tzkt_get_block(self, block_id: Union[int, str]) -> dict:
-        """TZKT API equivalent of self.get_block().
+        """TzKT API equivalent of self.get_block().
 
         Parameters
         ----------
@@ -293,7 +297,7 @@ class TezosConnection(object):
     def tzkt_get_transactions_by_block(
         self, block_id: Union[int, str], status: str = "applied"
     ) -> pd.DataFrame:
-        """TZKT API equivalent of self.get_transactions_by_block(). Includes optional
+        """TzKT API equivalent of self.get_transactions_by_block(). Includes optional
         filtering by transaction status.
 
         Ref.: https://api.tzkt.io/#operation/Operations_GetTransactions
@@ -325,7 +329,7 @@ class TezosConnection(object):
         return df
 
     def tzkt_get_transaction_by_hash(self, txn_hash: str) -> pd.DataFrame:
-        """TZKT API extension of self.tzkt_get_transactions_by_block() that pulls data
+        """TzKT API extension of self.tzkt_get_transactions_by_block() that pulls data
         for a single operation.
 
         Ref.: https://api.tzkt.io/#operation/Operations_GetTransactionByHash
@@ -398,14 +402,11 @@ class TezosConnection(object):
             .unique()
             .tolist()
         )
-        sales = [
-            self.tzkt_get_fxhash_sale(txn_data=txns, txn_hash=i)
-            for i in sales_hashes
-        ]
+        sales = [self.tzkt_get_fxhash_sale(txn_hash=i) for i in sales_hashes]
         logging.debug(f"Found {len(sales)} fxhash sales in block '{block_id}'.")
         return sales
 
-    def tzkt_get_fxhash_sale(self, txn_data: pd.DataFrame, txn_hash: str) -> FxhashSale:
+    def tzkt_get_fxhash_sale(self, txn_hash: str) -> FxhashSale:
         """Pull sale info from an fxhash sale operation and construct a FxhashSale data
         class. Each fxhash sale operation contains one "collect" transaction, one
         "transfer" transaction, and zero or more balance transfer transactions.
@@ -422,10 +423,6 @@ class TezosConnection(object):
 
         Parameters
         ----------
-        txn_data: pd.DataFrame
-            Block transaction data from self.tzkt_get_fxhash_sales_by_block() or
-            self.tzkt_get_transactions_by_block(). Must have all elements of the sale
-            operation with hash txn_hash.
         txn_hash: str
             Operation hash.
 
@@ -435,14 +432,14 @@ class TezosConnection(object):
             Attributes listed above.
         """
         logging.debug(f"Pulling fxhash sale '{txn_hash}'.")
-        txn = txn_data.loc[txn_data["hash"] == txn_hash]
+        txn = self.tzkt_get_transaction_by_hash(txn_hash=txn_hash)
         try:
             collect = txn.loc[txn["parameter.entrypoint"] == "collect"][:1].squeeze()
             transfer = txn.loc[txn["parameter.entrypoint"] == "transfer"][:1].squeeze()
         except IndexError:
             emsg = (
                 f"Unable to pull 'collect' and 'transfer' transactions within sale "
-                f"operation '{txn_hash}'. Check input transaction data."
+                f"operation '{txn_hash}'."
             )
             logging.critical(emsg)
             raise ValueError(emsg)
@@ -452,17 +449,19 @@ class TezosConnection(object):
         # Avoid raising errors if the data model has changed or data is missing.
         # TODO: This disappeared without warning - no longer able to pull seller info?
         diffs = next(iter(collect.get("diffs", list())), dict())
-        # Seller alias requires a separate call to pull. Grab that first.
-        seller_hash = (
+        sale.seller_hash = (
             diffs.get("content", dict()).get("value", dict()).get("issuer", None)
         )
-        sale.seller_hash = seller_hash
         sale.seller_alias = (
-            self.tzkt_get_account(seller_hash).get("alias") if seller_hash else None
+            self.fxhash_get_profile_alias(sale.seller_hash)
+            if sale.seller_hash
+            else None
+        )
+        sale.buyer_hash = collect.get("sender.address")
+        sale.buyer_alias = (
+            self.fxhash_get_profile_alias(sale.buyer_hash) if sale.buyer_hash else None
         )
         sale.amount = collect.get("amount", 0) / 1000000  # MuTez -> Tez
-        sale.buyer_hash = collect.get("sender.address")
-        sale.buyer_alias = collect.get("sender.alias")
         sale.timestamp = collect.get("timestamp", pd.NaT)
         # Token ID is the only element pulled from the "transfer" txn.
         tparams = next(iter(transfer.get("parameter.value", list())), dict())
@@ -525,8 +524,9 @@ class TezosConnection(object):
         except AttributeError:
             token_hash = None
         try:
+            # Non-greedy search required to grab specific element.
             token_author = re.findall(
-                r"created by<\/span><span class=\"\s{0}\">(\w*)<\/span>", text
+                'created by<\/span><span class="\s?">(.*?)<\/span>', text
             )[0]
         except IndexError:
             logging.error(f"Error pulling fxhash author for token '{token_id}'.")
@@ -540,3 +540,39 @@ class TezosConnection(object):
         }
         logging.info(f"Pulled fxhash token '{token_id}'.")
         return token_data
+
+    def fxhash_get_profile_alias(self, profile_hash: str) -> str:
+        """Pull a fxhash user's profile alias if one exists.
+
+        Parameters
+        ----------
+        profile_hash: str
+            Full ID hash of their profile.
+
+        Returns
+        ---------
+        str
+            Alias if one exists. If no alias is found, return the full ID hash.
+        """
+        logging.debug(f"Pulling fxhash user '{profile_hash}'.")
+        url = f"https://fxhash.xyz/pkh/{profile_hash}/collection"
+        # fxhash site pages don't return jsonifiable output, so self.get cannot be used.
+        resp = requests.get(url=url)
+        if result_code := resp.status_code != 200:
+            emsg = (
+                f"Unable to pull fxhash user '{profile_hash}' - call yielded "
+                f"'{result_code}': {resp}."
+            )
+            logging.error(emsg)
+            raise TezosError(emsg)
+
+        text = resp.text
+        # TODO: Another spaghetti front-end regex solution to clean up.
+        try:
+            alias = re.findall("<title>fxhash — (.*) profile<\/title>", text)[0]
+        except IndexError:
+            logging.info(f"Fxhash user '{profile_hash}' does not have an alias.")
+            return profile_hash
+        else:
+            logging.info(f"Fxhash user '{profile_hash}' has alias '{alias}'.")
+            return alias

@@ -10,7 +10,7 @@ import dotenv
 
 dotenv.load_dotenv(pathlib.Path(__file__).with_name(".env"))
 
-HARVEY_VERSION = "1.0.0"
+HARVEY_VERSION = "1.1.0"
 
 BOT_ID = os.getenv("BOT_ID")
 TOKEN = os.getenv("BOT_TOKEN")

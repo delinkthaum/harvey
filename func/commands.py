@@ -654,19 +654,16 @@ def fxhash_sales_feed(bot: commands.Bot):
         amount = sale.amount
         amount_string = f"{amount}ꜩ"
         embed.add_field(name="Sale Amount", value=amount_string, inline=False)
-        # Field 2: Link to the seller's fxhash profile. Use their alias if possible.
+        # Field 2: Link to the seller's fxhash profile.
         seller_hash = sale.seller_hash
-        seller_alias = sale.seller_hash
-        # Alias sometimes comes through as a NaN float.
-        seller_alias = seller_alias if seller_alias is True else seller_hash
+        seller_alias = sale.seller_alias
         seller_string = (
             f"[{seller_alias}](https://www.fxhash.xyz/pkh/{seller_hash}/collection)"
         )
         embed.add_field(name="Seller", value=seller_string, inline=False)
-        # Field 3: Link to the buyer's fxhash profile. Use their alias if possible.
+        # Field 3: Link to the buyer's fxhash profile.
         buyer_hash = sale.buyer_hash
         buyer_alias = sale.buyer_alias
-        buyer_alias = buyer_alias if buyer_alias is True else buyer_hash
         buyer_string = (
             f"[{buyer_alias}](https://www.fxhash.xyz/pkh/{buyer_hash}/collection)"
         )
@@ -688,7 +685,8 @@ def fxhash_sales_feed(bot: commands.Bot):
             )
             return await ctx.send(message)
 
-    @fxhash_sales_feed.command(aliases=["running", "status"])
+    # TODO: Add argument protection so the user can't mock their own message.
+    @fxhash_sales_feed.command(aliases=["status"])
     async def notify(ctx: commands.Context, override_status: str = None):
         """Check the status of the sales feed and provide an update to the user. If
         the optional override_status is provided, instead notify them of the given
@@ -721,7 +719,7 @@ def fxhash_sales_feed(bot: commands.Bot):
             )
         return await ctx.send(message)
 
-    @fxhash_sales_feed.command(aliases=["a", "set", "s"])
+    @fxhash_sales_feed.command(aliases=["set", "update"])
     async def add(
         ctx: commands.Context, channel: discord.TextChannel, min_amount: int = 0
     ):
@@ -769,7 +767,7 @@ def fxhash_sales_feed(bot: commands.Bot):
                 f"`{min_amount}ꜩ`."
             )
 
-    @fxhash_sales_feed.command(aliases=["r", "rem", "d", "del"])
+    @fxhash_sales_feed.command(aliases=["rem", "delete", "del"])
     async def remove(ctx: commands.Context, channel: discord.TextChannel):
         """Remove a sales feed channel in a server.
 
@@ -802,9 +800,7 @@ def fxhash_sales_feed(bot: commands.Bot):
                 f"Unable to remove sales feed channel {channel.mention}."
             )
         else:
-            return await ctx.send(
-                f"Removed sales feed channel {channel.mention}."
-            )
+            return await ctx.send(f"Removed sales feed channel {channel.mention}.")
 
     @fxhash_sales_feed.command(aliases=["list"])
     async def list_channels(ctx: commands.Context):
@@ -824,17 +820,19 @@ def fxhash_sales_feed(bot: commands.Bot):
             channel = await bot.fetch_channel(row.channel_id)
             amount = f"{row.minimum_sale_amount}ꜩ"
             sales_channels.append(f"{channel.mention} - {amount}")
+        sales_channels = "\n".join(sales_channels)
         embed = discord.Embed(
             title="Sales Feeds",
             description=(
                 f"Below are the sales feed channels in the current server with their "
-                f"minimum sale amounts::\n\n_ _{'\n'.join(sales_channels)}"
-            )
+                f"minimum sale amounts:\n\n_ _{sales_channels}"
+            ),
         )
         embed.set_footer(text="Use `!feed add` to add a new sales feed channel.")
         return await ctx.send(embed=embed)
 
     @fxhash_sales_feed.command(aliases=["begin"])
+    @commands.has_permissions(administrator=True)
     async def start(ctx: commands.Context):
         """Start the sales feed and loop through blocks. If it's already active, notify
         the user.
@@ -913,6 +911,7 @@ def fxhash_sales_feed(bot: commands.Bot):
 
                 # Construct and post message where appropriate.
                 embed = await create_message(sale=sale)
+                await asyncio.sleep(0.5)  # Delay to avoid image issues.
 
                 post_channels = sales_feeds.loc[
                     sale.amount >= sales_feeds["minimum_sale_amount"]
@@ -925,6 +924,7 @@ def fxhash_sales_feed(bot: commands.Bot):
                         f"Posting message for {token_id} in channel '{channel_id}' in "
                         f"server '{guild_id}'."
                     )
+                    await asyncio.sleep(0.5)  # Delay to avoid image issues.
                     await channel.send(embed=embed)
                     logging.info(
                         f"Posted message for {token_id} in channel '{channel_id}' in "
@@ -942,7 +942,8 @@ def fxhash_sales_feed(bot: commands.Bot):
             # Shorter delay to cycle through blocks if the loop gets behind.
             await asyncio.sleep(20)
 
-    @fxhash_sales_feed.command(aliases=["kill"])
+    @fxhash_sales_feed.command(aliases=["end"])
+    @commands.has_permissions(administrator=True)
     async def stop(ctx: commands.Context):
         """Stop the sales feed by updating bot.sales_feed_active to False. Notify the
         user.

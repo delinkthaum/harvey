@@ -558,13 +558,12 @@ class TezosConnection(object):
         url = f"https://fxhash.xyz/pkh/{profile_hash}/collection"
         # fxhash site pages don't return jsonifiable output, so self.get cannot be used.
         resp = requests.get(url=url)
-        if result_code := resp.status_code != 200:
-            emsg = (
+        if (result_code := resp.status_code) != 200:
+            logging.error(
                 f"Unable to pull fxhash user '{profile_hash}' - call yielded "
                 f"'{result_code}': {resp}."
             )
-            logging.error(emsg)
-            raise TezosError(emsg)
+            return profile_hash
 
         text = resp.text
         # TODO: Another spaghetti front-end regex solution to clean up.

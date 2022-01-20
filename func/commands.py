@@ -649,7 +649,7 @@ def fxhash_sales_feed(bot: commands.Bot):
         embed = discord.Embed(title=title, url=url)
         # Display the image.
         token_ipfs = sale.token_ipfs
-        embed.set_thumbnail(url=token_ipfs)
+        embed.set_image(url=token_ipfs)
         # Field 1: Sale amount.
         amount = sale.amount
         amount_string = f"{amount}ꜩ"
@@ -670,8 +670,8 @@ def fxhash_sales_feed(bot: commands.Bot):
         embed.add_field(name="Buyer", value=buyer_string, inline=False)
         # Field 4: Link to the sale operation on tzkt.
         txn_hash = sale.txn_hash
-        sale_string = f"[tzkt.io](https://tzkt.io/{txn_hash})"
-        embed.add_field(name="Sale Operation", value=sale_string, inline=False)
+        link_string = f"[operation](https://tzkt.io/{txn_hash}) / [ipfs]({token_ipfs})"
+        embed.add_field(name="Links", value=link_string, inline=False)
 
         return embed
 
@@ -685,7 +685,6 @@ def fxhash_sales_feed(bot: commands.Bot):
             )
             return await ctx.send(message)
 
-    # TODO: Add argument protection so the user can't mock their own message.
     @fxhash_sales_feed.command(aliases=["status"])
     async def notify(ctx: commands.Context, override_status: str = None):
         """Check the status of the sales feed and provide an update to the user. If
@@ -700,6 +699,11 @@ def fxhash_sales_feed(bot: commands.Bot):
             Optional status to provide the user - used for start/stop notifications.
             (Optional) Defaults to: None
         """
+        # Don't allow the user to spoof statuses by directly calling this command.
+        if ctx.command.name == "notify" and override_status:
+            raise commands.ArgumentParsingError(
+                f"'{ctx.command}' does not accept arguments."
+            )
         if not override_status:
             status = "Running" if bot.sales_feed_active else "Inactive"
         else:
